@@ -1,0 +1,68 @@
+Semaphore* mutex = new Semaphore(1);
+Semaphore* rw_mutex = new Semaphore(1);
+Semaphore* write_sem = new Semaphore(0);
+int read_count = 0;
+bool writer_waiting = false;
+
+// Reader code
+do{
+  // Entry section
+  mutex->wait(processID);
+  if(write_count > 0 || writer_waiting){
+    // Release the mutex and wait for the write_sem semaphore
+    mutex->signal();
+    read_sem->wait();
+  }
+  else{
+    // No writers or waiting writers, proceed with reading
+    read_count++;
+    mutex->signal();
+  }
+
+  // Critical section
+  // Reading happens here
+
+  // Exit section
+  rw_mutex->wait(processID);
+  read_count--;
+  if(read_count == 0 && writer_waiting){
+    write_sem->signal();
+  }
+  rw_mutex->signal();
+
+  // Remainder section
+} while (true);
+
+// Writer code
+do{
+  // Entry section
+  mutex->wait(processID);
+  if(read_count > 0 || write_count > 0 || writer_waiting){
+    // Release the mutex and wait for the write_sem semaphore
+    writer_waiting = true;
+    mutex->signal();
+    write_sem->wait();
+  }
+  else{
+    // No readers or writers, proceed with writing
+    write_count++;
+    mutex->signal();
+  }
+
+  // Critical section
+  // Writing happens here
+
+  // Exit section
+  rw_mutex->wait(processID);
+  write_count--;
+  if(read_count > 0){
+    read_sem->signal();
+  }
+  else if(writer_waiting) {
+    write_sem->signal();
+    writer_waiting = false;
+  }
+  rw_mutex->signal();
+
+  // Remainder section
+} while (true);
